@@ -132,7 +132,7 @@ describe("stability", function(done) {
   })
 
   //TODO: remove `.skip` when working on and/or submitting fix for issue #453
-  describe.skip("race conditions", function(done) {
+  describe("race conditions", function(done) {
     var web3 = new Web3();
     var provider;
     var accounts;
@@ -158,28 +158,31 @@ describe("stability", function(done) {
       });
 
       var blockchain = provider.manager.state.blockchain;
-      blockchain.vm.stateManager.checkpoint(); // processCall or processBlock
-      blockchain.stateTrie.get(utils.toBuffer(accounts[0]), function() {}); // getCode (or any function that calls trie.get)
-      blockchain.vm.stateManager.revert(function() {
-        done();
+      blockchain.vm.stateManager.checkpoint(function () {
+        blockchain.stateTrie.get(utils.toBuffer(accounts[0]), function () {
+        }); // getCode (or any function that calls trie.get)
+        blockchain.vm.stateManager.revert(function () {
+          done();
+        }); // processCall or processBlonck
       }); // processCall or processBlock
     });
 
-    it("should not cause 'pop' of undefined", function(done) {
-      process.prependOnceListener('uncaughtException', function(err) {
+    it("should not cause 'pop' of undefined", function (done) {
+      process.prependOnceListener('uncaughtException', function (err) {
         done(err);
       });
 
       var blockchain = provider.manager.state.blockchain;
-      blockchain.vm.stateManager.checkpoint(); // processCall #1
-      // processNextBlock triggered by interval mining which at some point calls vm.stateManager.commit() and blockchain.putBlock()
-      blockchain.processNextBlock(function(err, tx, results) {
-        blockchain.vm.stateManager.revert(function() { // processCall #1 finishes
-          blockchain.latestBlock(function (err, latestBlock) { 
-            blockchain.stateTrie.root = latestBlock.header.stateRoot; // getCode #1 (or any function with this logic)
-            web3.eth.call({}, function() {
-              done();
-            }); // processCall #2
+      blockchain.vm.stateManager.checkpoint(function () {// processCall #1
+        // processNextBlock triggered by interval mining which at some point calls vm.stateManager.commit() and blockchain.putBlock()
+        blockchain.processNextBlock(function (err, tx, results) {
+          blockchain.vm.stateManager.revert(function () { // processCall #1 finishes
+            blockchain.latestBlock(function (err, latestBlock) {
+              blockchain.stateTrie.root = latestBlock.header.stateRoot; // getCode #1 (or any function with this logic)
+              web3.eth.call({}, function () {
+                done();
+              }); // processCall #2
+            });
           });
         });
       });
